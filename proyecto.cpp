@@ -1,85 +1,32 @@
+
 #include <iostream>
 #include <vector>
+#include <cstdlib>
+#include <ctime>
+
+#include "Proceso.h"
+#include "GeneradorProcesos.h"
+
 using namespace std;
 
-#define MIN_SPLIT 32
+int main() {
 
-class Proceso {
-public:
-    int id, tam, cuanto, cuantoInicial, llegada;
+    srand(time(0));
 
-    Proceso(int i = 0, int t = 0, int c = 0){
-        id = i;
-        tam = t;
-        cuanto = c;
-        cuantoInicial = c;
-        llegada = 0;
-    }
-    void imprimir(){
-        cout << "[" << id << "," << tam << "," << cuanto << "]";
-    }
-};
+    GeneradorProcesos generador(400, 10);
 
-struct Bloque { 
-    int inicio, tam;
-    bool libre;
-    Proceso prcs;
-};
+    vector<Proceso> procesos;
 
-class Memoria {
-    int total, modo;
-    vector<Bloque> b;
+    procesos = generador.generarProcesos(5);
 
-public:
-    Memoria(int t, int m){
-        total = t;
-        modo = m;
-        Bloque hueco = {0, t, true, Proceso()};
-        b.push_back(hueco);
-    }
-    bool asignar(Proceso p){
-        int idx = -1;
-        for (int i = 0; i < b.size(); i++){
-            if(!b[i].libre || b[i].tam < p.tam) continue;
-            if(modo == 1) {//primer ajuste
-                idx = i;
-                break;
-            }
-            if(idx == -1 || b[i].tam > b[idx].tam) idx = i; //peor ajuste
-        }
+    cout << "===== PROCESOS GENERADOS =====" << endl;
 
-        if(idx == -1) return false;
-        int sobra = b[idx].tam - p.tam;
-
-        if(sobra >= MIN_SPLIT){ //hacer hueco
-            Bloque resto = {b[idx].inicio + p.tam, sobra, true, Proceso()};
-            b[idx].tam = p.tam;
-            b.insert(b.begin() + idx + 1, resto);
-        } //si sobra menos de 32 no se parte
-        b[idx].libre = false;
-        b[idx].prcs = p;
-        return true;
+    for (int i = 0; i < procesos.size(); i++) {
+        procesos[i].imprimir();
+        cout << endl;
     }
 
-    Proceso* buscar(int id){
-        for (int i = 0; i < b.size(); i++)
-            if(!b[i].libre && b[i].prcs.id == id) return &b[i].prcs;
-        return 0;
-    }
-    void liberar(int id){
-        for (int i = 0; i < b.size(); i++){
-            if(!b[i].libre && b[i].prcs.id == id) b[i].libre = true;
-        }
-    }
-    bool condensar(){
-        bool unio = false;
-        for(int i = 0; i + 1 < b.size();){
-            if(b[i].libre && b[i + 1].libre){
-                b[i].tam += b[i + 1].tam;
-                b.erase(b.begin() + i + 1);
-                unio = true;
-            } else i++;
-        }
-        return unio;
-    }
-};
+    cout << "\nTotal de procesos: " << procesos.size() << endl;
+
+    return 0;
+}
