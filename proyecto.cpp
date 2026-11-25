@@ -1,5 +1,9 @@
 #include <iostream>
+#include <ctime>
 #include <vector>
+#include <thread>
+#include <chrono>
+#include <cstdlib>
 using namespace std;
 
 #define MIN_SPLIT 32
@@ -133,9 +137,9 @@ public:
         if(p->cuanto > 0) cola.push_back(id);
         if(p->cuanto == 0) {
             terminados++;
-            cout  << "Descargando proceso [" << p->id << "," << p->tam << ",0]";  
+            cout  << "\nDescargando proceso [" << p->id << "," << p->tam << ",0]\n";  
             mem.liberar(id);
-            if(mem.condensar()) cout << "Condesando huecos\n";
+            if(mem.condensar()) cout << "\nCondesando huecos\n";
         }
     }
     void imprimirCola(Memoria& mem) const {
@@ -158,46 +162,134 @@ public:
     
 };
 
-int main () {
-    int tamMemoria = 1024;
-    int modo = 2;
-    int cuantoSis = 2;
+class Simulador {
+private:
+    Memoria mem;
+    ListaRR cola;
+    int siguienteId, modo, tamMem, cuantoMax, cuantoSis, tamProceso, ciclos;
+    Proceso pendiente;
+    
 
-    Memoria mem(tamMemoria, modo);
-    ListaRR rr;
+    Proceso generar() {
+        Proceso p(siguienteId, rand() % tamProceso + 1, rand() % cuantoMax + 1);
+        siguienteId++;
+        return p;
+    }
 
-    Proceso llegadas[] {
-        Proceso(1, 300, 5),
-        Proceso(2, 200, 2),
-        Proceso(3, 150, 4)
-    };
 
-    cout << "\n Admision Inicial: \n";
-    for (int i = 0; i < 3; i++){
-        if(mem.asignar(llegadas[i])){
-            rr.encolarLista(llegadas[i].id);
+public:
+    Simulador (int tM, int modo, int cM, int cS, int tP) : mem(tM, modo) {
+        siguienteId = 1;
+        cuantoMax = cM;
+        cuantoSis = cS;
+        tamMem = tM;
+        tamProceso = tP; 
+        ciclos = 0;
+        pendiente = generar();
+    }
+
+    void ciclo(){
+        ciclos++;
+        cout << "Ciclos: " << ciclos << "\n";
+        
+        if(mem.asignar(pendiente)){
+            cola.encolarLista(pendiente.id);
             cout << "Entro: ";
-            llegadas[i].imprimir();
-            cout << "\n";
+            pendiente.imprimir();
+            cout  << "\n";
+            pendiente = generar();
         } else {
-            cout << "No cupo\n";
-            llegadas[i].imprimir();
+            cout << "Proceso: ";
+            pendiente.imprimir();
+            cout << " NO cupo en la memoria, espera\n";
+        }
+
+        mem.imprimirEstado();
+
+        if(cola.estaVacia()){
+            cout << "CPU vacia\n";
+        } else {    
+            cola.atenderProceso(mem, cuantoSis);
+            cola.imprimirCola(mem);
+            mem.imprimirEstado();
             cout << "\n";
         }
     }
 
-    mem.imprimirEstado();
-    rr.imprimirCola(mem);
-
-    cout << "\n Ejecucion de turnos: \n";
-    int turno = 1;
-    while(!rr.estaVacia()){
-        cout << "\n Turno: " << turno++ << "\n";
-        rr.atenderProceso(mem, cuantoSis);
-        mem.imprimirEstado();
-        rr.imprimirCola(mem);
+    void estadisticas() {
+        cout << "Procesos termiandos: " << cola.getTerminados();
     }
 
-    cout << "Procesos terminados: " << rr.getTerminados() << "\n";
+};
+
+int main () {
+    srand(time(NULL));
+    cout << "Simulador de memoria y planificador Round Robin\n";
+    
+    int tamMemoria, modo, cuantoSis, cuantoPrcs, tamPrcs;
+
+    // tamano de la memoria
+    do {
+        cout << "Ingrese el tamano de la memoria: \n 1. 1 MB \n 2. 4 MB \n 3. 8 MB \n";
+        cin >> tamMemoria;
+
+        if(tamMemoria < 1 || tamMemoria > 3) {
+            cout << "Opcion invalida\n";
+        }
+    } while (tamMemoria < 1 || tamMemoria > 3);
+    tamMemoria = (tamMemoria == 1) ? 1024 : (tamMemoria == 2) ? 4096 : 8192; 
+    
+    // algoritmo de colocacion
+    do {
+        cout << "Ingrese el alogritmo de colocacion: \n 1. Primer Ajuste \n 2. Peor Ajuste\n";
+        cin >> modo;
+
+        if(modo < 1 || modo > 2) {
+            cout << "Opcion invalida\n";
+        }
+    } while (modo < 1 || modo > 2);
+
+    // cuanto del sistema
+    do {
+        cout << "Ingrese el cuanto del sistema (positivo y entero): ";
+        cin >> cuantoSis;
+
+        if(cuantoSis < 1) {
+            cout << "Opcion invalida\n";
+        }
+    } while (cuantoSis < 1);
+
+    // cuanto de los procesos
+    do {
+        cout << "Ingrese el cuanto para los procesos (positivo y entero): ";
+        cin >> cuantoPrcs;
+
+        if(cuantoPrcs < 1) {
+            cout << "Opcion invalida\n";
+        }
+    } while (cuantoPrcs < 1);
+
+    // tamano maximo de los procesos
+    do {
+        cout << "Ingrese el tamano maximo de los procesos (KB): (Max: " << tamMemoria << ")";
+        cin >> tamPrcs;
+
+        if(tamPrcs < 1 || tamPrcs > tamMemoria) {
+            cout << "Opcion invalida\n";
+        }
+    } while (tamPrcs < 1 || tamPrcs > tamMemoria);
+
+    
+    
+    Simulador sim(tamMemoria, modo, cuantoPrcs, cuantoSis, tamPrcs);
+    for (int i = 0; i < 10; i++){
+        sim.ciclo();
+         this_thread::sleep_for(chrono::seconds(2));
+    }
+    sim.estadisticas();
+
     return 0;
 }
+
+
+
